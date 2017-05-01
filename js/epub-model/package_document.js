@@ -11,10 +11,13 @@
 //  used to endorse or promote products derived from this software without specific 
 //  prior written permission.
 
-define(['jquery', 'underscore', 'URIjs'],
-    function ($, _, URI) {
+define(['jquery', 'underscore', 'URIjs'], function ($, _, URI) {
 
     // Description: This model provides an interface for navigating an EPUB's package document
+    // R2: for WebPub based package document:
+    // packageDocumentURL == undefined
+    // resourceFetcher == undefined
+    // there is an extra parameter webpubJson (as a fallback for non-anticipated functions)
     var PackageDocument = function(packageDocumentURL, resourceFetcher, metadata, spine, manifest) {
 
         var _page_prog_dir;

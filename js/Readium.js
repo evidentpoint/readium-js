@@ -12,11 +12,13 @@
 //  prior written permission.
 
 
-define(['readium_shared_js/globals', 'text!version.json', 'jquery', 'underscore', 'readium_shared_js/views/reader_view', 'readium_js/epub-fetch/publication_fetcher',
-        'readium_js/epub-model/package_document_parser', 'readium_js/epub-fetch/iframe_zip_loader', 'readium_shared_js/views/iframe_loader'
+define(['readium_shared_js/globals', 'text!version.json', 'jquery', 'underscore', 
+        'readium_shared_js/views/reader_view', 'readium_js/epub-fetch/publication_fetcher',
+        'readium_js/epub-model/package_document_parser', 'readium_js/epub-model/webpub_manifest_parser',
+        'readium_js/epub-fetch/iframe_zip_loader', 'readium_shared_js/views/iframe_loader'
         ],
     function (Globals, versionText, $, _, ReaderView, PublicationFetcher,
-              PackageParser, IframeZipLoader, IframeLoader) {
+              PackageParser, WebpubManifestParser, IframeZipLoader, IframeLoader) {
 
     var DEBUG_VERSION_GIT = false; 
 
@@ -93,6 +95,47 @@ define(['readium_shared_js/globals', 'text!version.json', 'jquery', 'underscore'
         this.reader = new ReaderView(readerOptions);
         ReadiumSDK.reader = this.reader;
 
+        // create PackageDocument based on Web Publication Manifest
+        function createPackageDocumentByWebPub(webpubUrl, callback, openPageRequest) {
+            console.log('createPackageDocumentByWebPub: fetching Web Pub Manifest: ' + webpubUrl);
+
+            // fetch Web Publication Manifest
+            fetch(webpubUrl).then(function (response) {
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error('createPackageDocumentByWebPub: non-OK status: ' + response.statusText);
+            }).then(function (webpubJson) {
+
+                // parse Webpub Manifest
+                return WebpubManifestParser.parse(webpubJson);
+            }).then(function (packageDocument) {
+                
+                var cacheSizeEvictThreshold = null;
+                if (readiumOptions.cacheSizeEvictThreshold) {
+                    cacheSizeEvictThreshold = readiumOptions.cacheSizeEvictThreshold;
+                }
+
+                var openBookOptions = readiumOptions.openBookOptions || {};
+                var openBookData = $.extend(packageDocument.getSharedJsPackageData(), openBookOptions);
+
+                if (openPageRequest) {
+                    openBookData.openPageRequest = openPageRequest;
+                }
+                self.reader.openBook(openBookData);
+
+                var options = {
+                    metadata: packageDocument.getMetadata()
+                };
+
+                callback(packageDocument, options);
+            }).catch(function (error) {
+                console.log('openPackageDocument: problem fetching Web Pub Manifest: ' + error.message);
+                callback(undefined);
+
+            });
+        }
+        
         var openPackageDocument_ = function(ebookURL, callback, openPageRequest, contentType)  {
             if (_currentPublicationFetcher) {
                 _currentPublicationFetcher.flushCache();
@@ -142,7 +185,13 @@ define(['readium_shared_js/globals', 'text!version.json', 'jquery', 'underscore'
 
 
         this.openPackageDocument = function(ebookURL, callback, openPageRequest)  {
+            
+            // R2: check if ebookURL is actually Web Publication Manifest URL
+            if (ebookURL && ebookURL.indexOf('manifest.json') != -1) {
+                return createPackageDocumentByWebPub(ebookURL, callback, openPageRequest);
+            }
                         
+            // legacy ebookURL processing
             if (!(ebookURL instanceof Blob)
                 && !(ebookURL instanceof File)
                 // && ebookURL.indexOf("file://") != 0
