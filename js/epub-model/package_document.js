@@ -18,7 +18,8 @@ define(['jquery', 'underscore', 'URIjs'], function ($, _, URI) {
     // packageDocumentURL == undefined
     // resourceFetcher == undefined
     // there is an extra parameter webpubJson (as a fallback for non-anticipated functions)
-    var PackageDocument = function(packageDocumentURL, resourceFetcher, metadata, spine, manifest) {
+    var PackageDocument = function(packageDocumentURL, resourceFetcher, 
+                                   metadata, spine, manifest, webpubJson) {
 
         var _page_prog_dir;
 
@@ -26,7 +27,8 @@ define(['jquery', 'underscore', 'URIjs'], function ($, _, URI) {
 
         this.getSharedJsPackageData = function () {
 
-            var packageDocRoot = packageDocumentURL.substr(0, packageDocumentURL.lastIndexOf("/"));
+            var packageDocRoot = packageDocumentURL ? 
+                packageDocumentURL.substr(0, packageDocumentURL.lastIndexOf("/")) : '';
             return {
                 rootUrl : packageDocRoot,
                 rendition_viewport : metadata.rendition_viewport,

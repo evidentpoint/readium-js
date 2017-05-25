@@ -30,7 +30,7 @@ define(['jquery', 'underscore', '../epub-fetch/markup_parser', 'URIjs', './packa
             // form essential part of package document
             var metadata = getMetadata(webpubJson);
             var manifest = new Manifest(getJsonManifest(webpubJson));
-            var spine = getJsonSpine(xmlDom, manifest, metadata);
+            var spine = getJsonSpine(webpubJson, manifest, metadata);
 
             // after manifest is processed "cover" should be discovered 
             metadata.cover_href = cover;
@@ -47,7 +47,7 @@ define(['jquery', 'underscore', '../epub-fetch/markup_parser', 'URIjs', './packa
             // var page_prog_dir = getElemAttr(xmlDom, 'spine', "page-progression-direction");
             packageDocument.setPageProgressionDirection(webpubJson.metadata.direction);
             
-            return new Promise.resolve(packageDocument);
+            return Promise.resolve(packageDocument);
 
             // R2: this is left out for now - we will figure out how to deal with MO later
             // this is the last that calls callback
@@ -256,9 +256,8 @@ define(['jquery', 'underscore', '../epub-fetch/markup_parser', 'URIjs', './packa
             // metadata.rendition_viewports = viewports;
 
 
-            // R2: skipping for now setting of metadata.mediaItems and metadata.media_overlay
+            // R2: skipping for now setting of metadata.mediaItems
             metadata.mediaItems = [];
-            metadata.media_overlay = {};
             
             // // Media part
             // metadata.mediaItems = [];
@@ -295,23 +294,32 @@ define(['jquery', 'underscore', '../epub-fetch/markup_parser', 'URIjs', './packa
             //         "list-item", "glossary"]
             // };
 
+            // R2: filling with default values for now
+            metadata.media_overlay = {
+                duration: 0,
+                narrator: '',
+                activeClass: '',
+                playbackActiveClass: '',
+                smil_models: [],
+                skippables: ["sidebar", "practice", "marginalia", "annotation", "help", "note", "footnote", "rearnote",
+                    "table", "table-row", "table-cell", "list", "list-item", "pagebreak"],
+                escapables: ["sidebar", "bibliography", "toc", "loi", "appendix", "landmarks", "lot", "index",
+                    "colophon", "epigraph", "conclusion", "afterword", "warning", "epilogue", "foreword",
+                    "introduction", "prologue", "preface", "preamble", "notice", "errata", "copyright-page",
+                    "acknowledgments", "other-credits", "titlepage", "imprimatur", "contributors", "halftitlepage",
+                    "dedication", "help", "annotation", "marginalia", "practice", "note", "footnote", "rearnote",
+                    "footnotes", "rearnotes", "bridgehead", "page-list", "table", "table-row", "table-cell", "list",
+                    "list-item", "glossary"]
+            };
+
             return metadata;
         }
 
-        // 
-        function getJsonSpine(xmlDom, manifest, metadata) {
+        // recreates Package Document's spine based on "spine" section of webpub
+        function getJsonSpine(webpubJson, manifest, metadata) {
 
-            var $spineElements;
-            var jsonSpine = [];
+            var spine = webpubJson.spine.map(function(webpubItem) {
 
-            $spineElements = $(findXmlElemByLocalNameAnyNS(xmlDom, "spine")).children();
-            $.each($spineElements, function (spineElementIndex, currSpineElement) {
-
-                var $currSpineElement = $(currSpineElement);
-                var idref = $currSpineElement.attr("idref") ? $currSpineElement.attr("idref") : "";
-                var manifestItem = manifest.getManifestItemByIdref(idref);
-
-                var id = $currSpineElement.attr("id");
                 var viewport = undefined;
                 _.each(metadata.rendition_viewports, function (vp) {
                     if (vp.refines == id) {
@@ -321,23 +329,25 @@ define(['jquery', 'underscore', '../epub-fetch/markup_parser', 'URIjs', './packa
                 });
 
                 var spineItem = {
+                    href: webpubItem.href,
+                    media_type: webpubItem.type,
+                    // assuming that the order of spine items in webpub indicates that they are linear
+                    linear: 'yes',
+
+                    // R2: these data is lost 
                     rendition_viewport: viewport,
-                    idref: idref,
-                    href: manifestItem.href,
-                    manifest_id: manifestItem.id,
-                    media_type: manifestItem.media_type,
-                    media_overlay_id: manifestItem.media_overlay_id,
-                    linear: $currSpineElement.attr("linear") ? $currSpineElement.attr("linear") : "",
-                    properties: $currSpineElement.attr("properties") ? $currSpineElement.attr("properties") : ""
+                    idref: '',
+                    manifest_id: '',
+                    media_overlay_id: '',
+                    properties: ''
                 };
 
-                var parsedProperties = parsePropertiesString(spineItem.properties);
-                $.extend(spineItem, parsedProperties);
-
-                jsonSpine.push(spineItem);
+                // var parsedProperties = parsePropertiesString(spineItem.properties);
+                // $.extend(spineItem, parsedProperties);
+                return spineItem;
             });
 
-            return jsonSpine;
+            return spine;
         }
 
         // convert web pub item into package doc manifest item
